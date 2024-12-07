@@ -104,65 +104,88 @@ else:
     tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["📂 Project Overview", "📊 Progress Tracking", "💰 Financials",
                                                   "✅ Task Management", "📄 Documents", "💼 Interim Claims"])
 
-    # Tab 1: Project Overview
-    with tab1:
-        st.header("📂 Project Overview")
-        st.markdown("View and manage all your projects here.")
-        project_action = st.radio("Choose an action", ["Register New Project", "View Existing Projects"])
+    # Enhanced Project Overview
+with tab1:
+    st.header("📂 Project Overview")
+    st.markdown("View, manage, or track your projects effectively.")
 
-        if project_action == "Register New Project":
-            with st.form(key="project_form"):
+    project_action = st.radio("Choose an action", ["Register New Project", "View Existing Projects"])
+
+    if project_action == "Register New Project":
+        with st.form(key="project_form"):
+            col1, col2 = st.columns(2)
+            with col1:
+                project_name = st.text_input("Project Name", help="Enter a unique name for the project")
+                project_id = st.text_input("Project ID", help="Provide a unique identifier for the project")
+                client_name = st.text_input("Client Name")
+            with col2:
+                start_date = st.date_input("Start Date")
+                end_date = st.date_input("End Date", min_value=start_date)
+                budget = st.number_input("Budget ($)", min_value=0, value=100000, step=1000)
+
+            submit = st.form_submit_button("Register Project")
+            if submit:
+                if not project_name or not project_id or not client_name:
+                    st.error("All fields are required!")
+                else:
+                    new_project = {
+                        "name": project_name,
+                        "id": project_id,
+                        "client": client_name,
+                        "start_date": start_date.isoformat(),
+                        "end_date": end_date.isoformat(),
+                        "budget": budget,
+                        "progress": 0,
+                        "tasks": [],
+                        "documents": [],
+                        "interim_claims": []
+                    }
+
+                    st.session_state.projects.append(new_project)
+                    save_projects()
+                    st.success(f"Project **{project_name}** registered successfully!")
+                    st.balloons()
+
+    elif project_action == "View Existing Projects":
+        load_projects()
+
+        if st.session_state.projects:
+            project_names = [proj["name"] for proj in st.session_state.projects]
+            selected_project = st.selectbox("Select a Project to View", project_names)
+
+            if selected_project:
+                project_data = next(proj for proj in st.session_state.projects if proj["name"] == selected_project)
+
                 col1, col2 = st.columns(2)
                 with col1:
-                    project_name = st.text_input("Project Name")
-                    project_id = st.text_input("Project ID")
-                    client_name = st.text_input("Client Name")
+                    st.subheader(f"📋 {project_data['name']}")
+                    st.markdown(f"**Project ID**: {project_data['id']}")
+                    st.markdown(f"**Client Name**: {project_data['client']}")
+                    st.markdown(f"**Start Date**: {project_data['start_date']}")
+                    st.markdown(f"**End Date**: {project_data['end_date']}")
+                    st.markdown(f"**Budget**: ${project_data['budget']:,.2f}")
+
                 with col2:
-                    start_date = st.date_input("Start Date")
-                    end_date = st.date_input("End Date", min_value=start_date)
-                    budget = st.number_input("Budget ($)", min_value=0, value=100000)
+                    st.progress(project_data["progress"] / 100)
+                    st.markdown(f"**Progress**: {project_data['progress']}%")
 
-                submit = st.form_submit_button("Register Project")
-                if submit:
-                    if not project_name or not project_id or not client_name:
-                        st.error("All fields are required!")
-                    else:
-                        new_project = {
-                            "name": project_name,
-                            "id": project_id,
-                            "client": client_name,
-                            "start_date": start_date.isoformat(),
-                            "end_date": end_date.isoformat(),
-                            "budget": budget,
-                            "progress": 0,
-                            "tasks": [],
-                            "documents": [],
-                            "interim_claims": []  # Ensure interim_claims is initialized as an empty list
-                        }
-
-                        st.session_state.projects.append(new_project)
-                        save_projects()
-                        st.success(f"Project {project_name} registered successfully!")
-
-        elif project_action == "View Existing Projects":
-            load_projects()
-
-            if st.session_state.projects:
-                project_names = [proj["name"] for proj in st.session_state.projects]
-                selected_project = st.selectbox("Select a Project to Track", project_names,
-                                                key="existing_project_select")
-                project_data = next(proj for proj in st.session_state.projects if proj["name"] == selected_project)
-                st.write("**Project Details:**")
-                st.json(project_data)
+                # Update progress
+                new_progress = st.slider("Update Progress", min_value=0, max_value=100, value=project_data["progress"])
+                if st.button("Save Progress"):
+                    project_data["progress"] = new_progress
+                    save_projects()
+                    st.success(f"Progress updated to {new_progress}%!")
 
                 # Option to delete project
-                if st.button("Delete Project", key=f"delete_{selected_project}"):
-                    st.session_state.projects = [proj for proj in st.session_state.projects if
-                                                 proj["name"] != selected_project]
+                if st.button("Delete Project"):
+                    st.session_state.projects = [proj for proj in st.session_state.projects if proj["name"] != selected_project]
                     save_projects()
-                    st.success(f"Project {selected_project} deleted successfully!")
-            else:
-                st.info("No projects available. Please register a new project.")
+                    st.warning(f"Project **{selected_project}** deleted.")
+                    st.experimental_rerun()
+
+        else:
+            st.info("No projects available. Please register a new project.")
+
 
     # Tab 2: Progress Tracking
     with tab2:
