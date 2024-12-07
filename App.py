@@ -438,48 +438,69 @@ else:
                     save_projects()
                     st.success(f"Claim of ${claim_amount} added successfully!")
 
-                       elif interim_claim_action == "View Claims":
+            elif interim_claim_action == "View Claims":
                 # View Claims in Table Form with Search and Filter
                 if project_data["interim_claims"]:
                     # Convert claims data to DataFrame
                     claims_df = pd.DataFrame(project_data["interim_claims"])
-                    st.write("Interim Claims Overview:")
+                    claims_df.index += 1  # Start indexing from 1
+                    claims_df = claims_df.rename(columns={
+                        "amount": "Claim Amount ($)",
+                        "status": "Claim Status",
+                        "payment_schedule": "Payment Schedule",
+                        "notes": "Claim Notes"
+                    })
+
+                    # Filter by status, amount, or date
+                    filter_status = st.selectbox("Filter by Claim Status", ["All", "Pending", "Approved", "Rejected"],
+                                                 index=0)
+                    if filter_status != "All":
+                        claims_df = claims_df[claims_df["Claim Status"] == filter_status]
+
+                    # Search bar for amount or notes
+                    search_term = st.text_input("Search Claims", "")
+                    if search_term:
+                        claims_df = claims_df[
+                            claims_df.apply(lambda row: row.astype(str).str.contains(search_term).any(), axis=1)]
+
+                    # Sorting options
+                    sort_by = st.selectbox("Sort Claims By", ["Claim Amount ($)", "Payment Schedule", "Claim Status"],
+                                           index=0)
+                    claims_df = claims_df.sort_values(by=sort_by, ascending=True)
+
+                    # Display the claims table
                     st.dataframe(claims_df)
 
-                    # Search functionality for claims
-                    search_query = st.text_input("Search Claims by Notes or Status")
-                    if search_query:
-                        filtered_claims = claims_df[
-                            claims_df.apply(
-                                lambda row: search_query.lower() in str(row["notes"]).lower() or
-                                            search_query.lower() in row["status"].lower(), axis=1
-                            )
-                        ]
-                        st.write("Filtered Claims:")
-                        st.dataframe(filtered_claims)
-                    else:
-                        st.info("No search query entered.")
+                    # Export Claims to CSV
+                    if st.button("Export Claims to CSV"):
+                        csv = claims_df.to_csv(index=False)
+                        st.download_button("Download CSV", csv, "claims_data.csv", "text/csv")
+
                 else:
-                    st.info("No claims available. Please add new claims.")
+                    st.info("No interim claims found for this project.")
 
             elif interim_claim_action == "Update Claim Status":
-                # Updating Existing Claims
+                # Update Existing Claim Status
                 if project_data["interim_claims"]:
-                    claim_indices = range(len(project_data["interim_claims"]))
-                    claim_to_update = st.selectbox("Select a Claim to Update", claim_indices, format_func=lambda x: f"Claim {x+1}")
-                    selected_claim = project_data["interim_claims"][claim_to_update]
+                    claim_options = [f"Claim #{idx + 1}" for idx in range(len(project_data["interim_claims"]))]
+                    selected_claim = st.selectbox("Select a Claim to Update", claim_options)
 
-                    # Update Form
-                    new_status = st.selectbox("Update Claim Status", ["Pending", "Approved", "Rejected"], index=["Pending", "Approved", "Rejected"].index(selected_claim["status"]))
-                    new_notes = st.text_area("Update Notes", value=selected_claim["notes"])
+                    # Get the selected claim's index
+                    claim_idx = claim_options.index(selected_claim)
+                    selected_claim_data = project_data["interim_claims"][claim_idx]
 
-                    if st.button("Update Claim"):
-                        selected_claim["status"] = new_status
-                        selected_claim["notes"] = new_notes
+                    # Allow user to update the status of the selected claim
+                    new_status = st.selectbox("Update Claim Status", ["Pending", "Approved", "Rejected"],
+                                              index=["Pending", "Approved", "Rejected"].index(
+                                                  selected_claim_data["status"]))
+
+                    if st.button(f"Update Status for {selected_claim}"):
+                        # Update the claim's status
+                        project_data["interim_claims"][claim_idx]["status"] = new_status
                         save_projects()
-                        st.success(f"Claim {claim_to_update + 1} updated successfully!")
+                        st.success(f"The status for {selected_claim} has been updated to {new_status}.")
                 else:
-                    st.info("No claims available to update.")
+                    st.info("No interim claims found for this project.")
 
             # Claim History or Audit Trail
             if project_data["interim_claims"]:
